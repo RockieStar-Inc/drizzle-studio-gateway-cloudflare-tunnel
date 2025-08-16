@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  drizzle-gateway:
+    build: .
+    container_name: drizzle_gateway_with_tunnel
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Drizzle Gateway configuration
+      - PORT=4983
+      - STORE_PATH=/app/data
+    volumes:
+      # Mount a local directory for persistent database storage
+      - ./data:/app/data
+    ports:
+      # Optional: expose port locally for development (comment out for production)
+      - "4983:4983"
