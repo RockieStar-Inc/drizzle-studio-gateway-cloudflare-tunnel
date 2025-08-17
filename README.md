@@ -20,11 +20,15 @@ A Docker setup that combines Drizzle Studio Gateway with Cloudflare Tunnel for s
    cp .env.example .env
    ```
 
-2. **Configure Cloudflare Tunnel**:
-   - Go to [Cloudflare Zero Trust Dashboard](https://one.dash.cloudflare.com/)
-   - Create a new tunnel
-   - Configure it to point to `http://localhost:4983`
-   - Copy the tunnel token to your `.env` file
+2. **Configure Cloudflare Tunnel** (optional):
+   - For permanent tunnel:
+     - Go to [Cloudflare Zero Trust Dashboard](https://one.dash.cloudflare.com/)
+     - Create a new tunnel
+     - Configure it to point to `http://localhost:4983`
+     - Copy the tunnel token to your `.env` file
+   - For temporary tunnel:
+     - Leave `CLOUDFLARE_TUNNEL_TOKEN` unset
+     - A random `*.trycloudflare.com` URL will be generated
 
 3. **Configure database** (optional):
    - Place your database files in the `data/` directory
@@ -38,7 +42,7 @@ A Docker setup that combines Drizzle Studio Gateway with Cloudflare Tunnel for s
 ## Configuration
 
 ### Environment Variables (.env)
-- `CLOUDFLARE_TUNNEL_TOKEN`: Your Cloudflare tunnel token (required)
+- `CLOUDFLARE_TUNNEL_TOKEN`: Your Cloudflare tunnel token (optional - if not set, uses temporary tunnel)
 - `PORT`: Gateway port (default: 4983)
 - `STORE_PATH`: Data storage path (default: /app/data)
 - `MASTERPASS`: Master password for gateway access
@@ -74,7 +78,7 @@ For local development, you can expose port 4983 by uncommenting the ports sectio
 ## Troubleshooting
 
 - Check logs: `docker-compose logs -f`
-- Verify tunnel token is correct in `.env` file
+- If using permanent tunnel, verify token is correct in `.env` file
 - Ensure database files are accessible in the `data/` directory
-- Check Cloudflare tunnel configuration in Zero Trust dashboard
-- If Cloudflare token is not set, only the Gateway will start (accessible via localhost)
+- Check Cloudflare tunnel configuration in Zero Trust dashboard (for permanent tunnels)
+- If no token is set, look for the temporary `*.trycloudflare.com` URL in the logs

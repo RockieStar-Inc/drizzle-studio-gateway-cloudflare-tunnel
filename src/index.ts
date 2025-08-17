@@ -37,7 +37,7 @@ class ProcessManager {
     return new Promise((resolve, reject) => {
       console.log('Starting Drizzle Studio Gateway...');
       
-      const gatewayPath = '/usr/local/bin/gateway';
+      const gatewayPath = '/usr/local/bin/drizzle-gateway';
       const port = process.env.PORT || '4983';
       const storePath = process.env.STORE_PATH || '/app/data';
       
@@ -91,26 +91,46 @@ class ProcessManager {
   private async startCloudflaredTunnel(): Promise<void> {
     return new Promise((resolve, reject) => {
       const tunnelToken = process.env.CLOUDFLARE_TUNNEL_TOKEN;
+      const port = process.env.PORT || '4983';
+      let args: string[];
 
-      if (!tunnelToken) {
-        console.error('CLOUDFLARE_TUNNEL_TOKEN environment variable is not set. Skipping tunnel.');
-        resolve(); // Don't fail if tunnel token is not provided
-        return;
+      if (tunnelToken) {
+        console.log('Starting Cloudflare tunnel with token...');
+        args = ['tunnel', '--no-autoupdate', 'run', '--token', tunnelToken];
+      } else {
+        console.log('Starting temporary Cloudflare tunnel (no token provided)...');
+        console.log('Note: This will generate a random *.trycloudflare.com URL');
+        args = ['tunnel', '--no-autoupdate', '--url', `http://localhost:${port}`];
       }
 
-      console.log('Starting Cloudflare tunnel...');
-
-      const args = ['tunnel', '--no-autoupdate', 'run', '--token', tunnelToken];
       this.tunnelProcess = spawn(cloudflaredPath, args, {
         stdio: ['pipe', 'pipe', 'pipe'],
       });
 
       this.tunnelProcess.stdout?.on('data', (data) => {
-        process.stdout.write(`[Tunnel] ${data}`);
+        const output = data.toString();
+        process.stdout.write(`[Tunnel] ${output}`);
+        
+        // Look for the temporary tunnel URL in the output
+        if (!tunnelToken && output.includes('trycloudflare.com')) {
+          const urlMatch = output.match(/https:\/\/[^\s]+\.trycloudflare\.com/);
+          if (urlMatch) {
+            console.log(`\n🌐 Temporary tunnel URL: ${urlMatch[0]}`);
+          }
+        }
       });
 
       this.tunnelProcess.stderr?.on('data', (data) => {
-        process.stderr.write(`[Tunnel] ${data}`);
+        const output = data.toString();
+        process.stderr.write(`[Tunnel] ${output}`);
+        
+        // Also check stderr for the URL (cloudflared sometimes outputs there)
+        if (!tunnelToken && output.includes('trycloudflare.com')) {
+          const urlMatch = output.match(/https:\/\/[^\s]+\.trycloudflare\.com/);
+          if (urlMatch) {
+            console.log(`\n🌐 Temporary tunnel URL: ${urlMatch[0]}`);
+          }
+        }
       });
 
       this.tunnelProcess.on('close', (code) => {
