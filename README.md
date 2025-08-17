@@ -6,7 +6,9 @@ A Docker setup that combines Drizzle Studio Gateway with Cloudflare Tunnel for s
 
 - **Drizzle Studio Gateway**: Web-based database management interface
 - **Cloudflare Tunnel**: Secure public access without exposing ports
-- **Bun Runtime**: Fast TypeScript/JavaScript runtime
+- **Bun Runtime**: Fast TypeScript/JavaScript runtime managing both processes
+- **Official Base Image**: Built on top of the official Drizzle Gateway Docker image
+- **Process Management**: TypeScript-based process manager for both services
 - **Docker Compose**: Easy deployment and management
 
 ## Quick Start
@@ -24,10 +26,9 @@ A Docker setup that combines Drizzle Studio Gateway with Cloudflare Tunnel for s
    - Configure it to point to `http://localhost:4983`
    - Copy the tunnel token to your `.env` file
 
-3. **Configure database**:
-   - Edit `config/gateway.config.json`
-   - Update admin credentials and database connections
+3. **Configure database** (optional):
    - Place your database files in the `data/` directory
+   - Update environment variables for database connections
 
 4. **Run**:
    ```bash
@@ -42,29 +43,28 @@ A Docker setup that combines Drizzle Studio Gateway with Cloudflare Tunnel for s
 - `STORE_PATH`: Data storage path (default: /app/data)
 - `MASTERPASS`: Master password for gateway access
 
-### Gateway Config (config/gateway.config.json)
-Configure admin users, regular users, and database connections. See the example file for structure.
+### Gateway Configuration
+The Drizzle Gateway uses its built-in configuration. You can access the web interface at the tunnel URL or locally at http://localhost:4983 (if port is exposed) to configure databases and users through the UI.
 
 ## Directory Structure
 
 ```
 .
-├── config/
-│   └── gateway.config.json   # Gateway configuration
 ├── data/                     # Database files (persistent)
 ├── src/
-│   └── index.ts             # Cloudflare tunnel wrapper
+│   └── index.ts             # TypeScript process manager for both services
 ├── .env                     # Environment variables
 ├── docker-compose.yml       # Docker Compose configuration
-├── Dockerfile              # Multi-stage Docker build
-└── entrypoint.sh           # Container startup script
+├── Dockerfile              # Built on official Drizzle Gateway image
+├── package.json            # Bun dependencies
+└── tsconfig.json           # TypeScript configuration
 ```
 
 ## Security Notes
 
-- Change default admin password in `gateway.config.json`
+- Configure admin credentials through the Drizzle Gateway web interface
 - Keep your `.env` file secure and never commit it
-- The container runs as non-root user for security
+- Set `MASTERPASS` environment variable for additional security
 - Cloudflare Tunnel provides secure access without exposing ports
 
 ## Development
@@ -74,6 +74,7 @@ For local development, you can expose port 4983 by uncommenting the ports sectio
 ## Troubleshooting
 
 - Check logs: `docker-compose logs -f`
-- Verify tunnel token is correct
+- Verify tunnel token is correct in `.env` file
 - Ensure database files are accessible in the `data/` directory
 - Check Cloudflare tunnel configuration in Zero Trust dashboard
+- If Cloudflare token is not set, only the Gateway will start (accessible via localhost)

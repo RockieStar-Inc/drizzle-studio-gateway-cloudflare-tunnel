@@ -1,40 +1,28 @@
-# Stage 1: Extract the Drizzle Gateway binary
-FROM ghcr.io/drizzle-team/gateway:latest as gateway
+# Use the official Drizzle Gateway image as base
+FROM ghcr.io/drizzle-team/gateway:latest
 
-# Stage 2: Build our Bun/TypeScript application
-FROM oven/bun:1-slim as builder
+# Install Bun
+RUN apt-get update && apt-get install -y curl unzip && \
+    curl -fsSL https://bun.sh/install | bash && \
+    ln -s /root/.bun/bin/bun /usr/local/bin/bun && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
 WORKDIR /app
+
+# Copy package files and install dependencies
 COPY package.json bun.lockb* ./
 RUN bun install --frozen-lockfile
-COPY . .
 
-# Stage 3: Create the final, lean production image
-FROM oven/bun:1-slim
-WORKDIR /app
+# Copy TypeScript source code
+COPY src/ ./src/
+COPY tsconfig.json ./
 
-# --- Security: Create a non-root user to run the application ---
-RUN useradd --create-home --shell /bin/bash appuser
-
-# Copy the gateway binary from the first stage
-COPY --from=gateway /app/gateway /usr/local/bin/gateway
-RUN chmod +x /usr/local/bin/gateway
-
-# Copy our application code and dependencies from the builder stage
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/src ./src
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/bun.lockb* ./
-COPY --from=builder /app/tsconfig.json ./tsconfig.json
-
-# Copy and set permissions for the entrypoint script
-COPY --chown=appuser:appuser entrypoint.sh .
-RUN chmod +x entrypoint.sh
-
-# Change to non-root user
-USER appuser
+# Create data directory for persistent storage
+RUN mkdir -p /app/data
 
 # Expose the Drizzle Gateway port
 EXPOSE 4983
 
-# Set the entrypoint to our script
-ENTRYPOINT ["./entrypoint.sh"]
+# Start our TypeScript process manager
+CMD ["bun", "run", "src/index.ts"]
