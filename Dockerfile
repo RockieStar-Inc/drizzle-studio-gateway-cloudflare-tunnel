@@ -1,8 +1,16 @@
-# Stage 1: Build stage with Bun
-FROM oven/bun:1 AS builder
+# Use Bun's slim image as base
+FROM oven/bun:1-slim
+
+# Install curl for downloading Drizzle Gateway
+RUN apt-get update && apt-get install -y curl && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
+
+# Download and setup Drizzle Gateway binary
+RUN curl -Lo /usr/local/bin/drizzle-gateway https://pub-e240a4fd7085425baf4a7951e7611520.r2.dev/drizzle-gateway-1.0.2-linux-x64 && \
+    chmod +x /usr/local/bin/drizzle-gateway
 
 # Copy package files and install dependencies
 COPY package.json bun.lockb* ./
@@ -11,21 +19,6 @@ RUN bun install --frozen-lockfile
 # Copy TypeScript source code
 COPY src/ ./src/
 COPY tsconfig.json ./
-
-# Stage 2: Final stage using Drizzle Gateway image
-FROM ghcr.io/drizzle-team/gateway:latest
-
-# Install Bun runtime (using their official Docker image's bun binary)
-COPY --from=oven/bun:1 /usr/local/bin/bun /usr/local/bin/bun
-
-# Set working directory
-WORKDIR /app
-
-# Copy application files from builder
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/src ./src
-COPY --from=builder /app/tsconfig.json ./
-COPY --from=builder /app/package.json ./
 
 # Create data directory for persistent storage
 VOLUME /app/data
