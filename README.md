@@ -5,17 +5,38 @@ A Docker setup that combines Drizzle Studio Gateway with Cloudflare Tunnel for s
 ## Features
 
 - **Drizzle Studio Gateway**: Web-based database management interface
-- **Cloudflare Tunnel**: Secure public access without exposing ports
+- **Cloudflare Tunnel**: Secure public access without exposing ports (permanent or temporary)
+- **Cross-Platform**: Works locally on macOS/Linux or in Docker containers
+- **Pre-built Docker Image**: Ready-to-use image from GitHub Container Registry
 - **Bun Runtime**: Fast TypeScript/JavaScript runtime managing both processes
-- **Official Base Image**: Built on top of the official Drizzle Gateway Docker image
 - **Process Management**: TypeScript-based process manager for both services
-- **Docker Compose**: Easy deployment and management
 
 ## Quick Start
 
+### Option 1: Using Pre-built Docker Image (Recommended)
+
+1. **Create project directory**:
+   ```bash
+   mkdir drizzle-gateway && cd drizzle-gateway
+   ```
+
+2. **Download docker-compose.yml and .env.example**:
+   ```bash
+   curl -O https://raw.githubusercontent.com/RockieStar-Inc/drizzle-studio-gateway-cloudflare-tunnel/main/docker-compose.yml
+   curl -O https://raw.githubusercontent.com/RockieStar-Inc/drizzle-studio-gateway-cloudflare-tunnel/main/.env.example
+   cp .env.example .env
+   ```
+
+3. **Run with Docker Compose**:
+   ```bash
+   docker-compose up -d
+   ```
+
+### Option 2: Build from Source
+
 1. **Clone and setup**:
    ```bash
-   git clone <your-repo>
+   git clone https://github.com/RockieStar-Inc/drizzle-studio-gateway-cloudflare-tunnel.git
    cd drizzle-studio-gateway-cloudflare-tunnel
    cp .env.example .env
    ```
@@ -30,22 +51,54 @@ A Docker setup that combines Drizzle Studio Gateway with Cloudflare Tunnel for s
      - Leave `CLOUDFLARE_TUNNEL_TOKEN` unset
      - A random `*.trycloudflare.com` URL will be generated
 
-3. **Configure database** (optional):
-   - Place your database files in the `data/` directory
-   - Update environment variables for database connections
-
-4. **Run**:
+3. **Build and run locally**:
    ```bash
+   # Uncomment the build line in docker-compose.yml
    docker-compose up --build
+   ```
+
+### Option 3: Run Locally (macOS/Linux)
+
+1. **Clone repository**:
+   ```bash
+   git clone https://github.com/RockieStar-Inc/drizzle-studio-gateway-cloudflare-tunnel.git
+   cd drizzle-studio-gateway-cloudflare-tunnel
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+
+3. **Setup environment**:
+   ```bash
+   cp .env.example .env
+   # Edit .env with your configuration
+   ```
+
+4. **Run locally**:
+   ```bash
+   npm start
    ```
 
 ## Configuration
 
 ### Environment Variables (.env)
-- `CLOUDFLARE_TUNNEL_TOKEN`: Your Cloudflare tunnel token (optional - if not set, uses temporary tunnel)
+
+#### Required/Recommended
+- `DRIZZLE_GATEWAY_MASTERPASS`: Master password for Drizzle Studio Gateway access (highly recommended for production)
+  - This password protects your database management interface
+  - The application will log the environment variable name and password length on startup
+  - Falls back to `MASTERPASS` if not set (for backward compatibility)
+
+#### Cloudflare Tunnel
+- `CLOUDFLARE_TUNNEL_TOKEN`: Your Cloudflare tunnel token
+  - Leave empty for temporary tunnel with random `*.trycloudflare.com` URL
+  - Set for permanent tunnel with your custom domain
+
+#### Optional Settings
 - `PORT`: Gateway port (default: 4983)
-- `STORE_PATH`: Data storage path (default: /app/data)
-- `MASTERPASS`: Master password for gateway access
+- `STORE_PATH`: Data storage path (default: /app/data in Docker, ./data locally)
 
 ### Gateway Configuration
 The Drizzle Gateway uses its built-in configuration. You can access the web interface at the tunnel URL or locally at http://localhost:4983 (if port is exposed) to configure databases and users through the UI.
@@ -64,16 +117,58 @@ The Drizzle Gateway uses its built-in configuration. You can access the web inte
 └── tsconfig.json           # TypeScript configuration
 ```
 
-## Security Notes
+## Security Best Practices
 
-- Configure admin credentials through the Drizzle Gateway web interface
-- Keep your `.env` file secure and never commit it
-- Set `MASTERPASS` environment variable for additional security
-- Cloudflare Tunnel provides secure access without exposing ports
+### Authentication
+- **Always set `DRIZZLE_GATEWAY_MASTERPASS`** in production environments
+- Use a strong, unique password (minimum 16 characters recommended)
+- The password length is logged on startup for verification (password itself is never logged)
+- Configure additional user credentials through the Drizzle Gateway web interface
+
+### Environment Security
+- Keep your `.env` file secure and never commit it to version control
+- Use secrets management for production deployments
+- Rotate passwords regularly
+
+### Network Security
+- Cloudflare Tunnel provides secure access without exposing ports directly
+- For permanent tunnels, configure access policies in Cloudflare Zero Trust
+- Temporary tunnels should only be used for development/testing
+
+## Docker Image
+
+### Using the Pre-built Image
+
+The pre-built Docker image is available at:
+```bash
+docker pull ghcr.io/rockiestar-inc/drizzle-studio-gateway-cloudflare-tunnel:main
+```
+
+### Quick Run with Docker
+
+```bash
+# With environment file
+docker run -d \
+  --name drizzle-gateway \
+  --env-file .env \
+  -v $(pwd)/data:/app/data \
+  ghcr.io/rockiestar-inc/drizzle-studio-gateway-cloudflare-tunnel:main
+
+# With inline environment variables
+docker run -d \
+  --name drizzle-gateway \
+  -e DRIZZLE_GATEWAY_MASTERPASS=your-secure-password \
+  -e CLOUDFLARE_TUNNEL_TOKEN=your-tunnel-token \
+  -v $(pwd)/data:/app/data \
+  ghcr.io/rockiestar-inc/drizzle-studio-gateway-cloudflare-tunnel:main
+```
 
 ## Development
 
-For local development, you can expose port 4983 by uncommenting the ports section in `docker-compose.yml`.
+### Local Development
+- For local development, expose port 4983 by uncommenting the ports section in `docker-compose.yml`
+- The application automatically downloads platform-specific Drizzle Gateway binaries for macOS/Linux
+- Binaries are cached in `node_modules/.bin` for subsequent runs
 
 ## Troubleshooting
 

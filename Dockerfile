@@ -26,5 +26,8 @@ VOLUME /app/data
 # Expose the Drizzle Gateway port
 EXPOSE 4983
 
+# Map the more specific env var to what Drizzle Gateway expects
+ENV MASTERPASS=$DRIZZLE_GATEWAY_MASTERPASS
+
 # Start our TypeScript process manager
 CMD ["bun", "run", "src/index.ts"]

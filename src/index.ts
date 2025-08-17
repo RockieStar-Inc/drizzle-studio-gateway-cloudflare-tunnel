@@ -139,8 +139,12 @@ class ProcessManager {
         STORE_PATH: storePath,
       };
 
-      if (process.env.MASTERPASS) {
-        env.MASTERPASS = process.env.MASTERPASS;
+      // Try both DRIZZLE_GATEWAY_MASTERPASS (preferred) and MASTERPASS (fallback)
+      const masterpass = process.env.DRIZZLE_GATEWAY_MASTERPASS || process.env.MASTERPASS;
+      if (masterpass) {
+        env.MASTERPASS = masterpass;
+        const envVarName = process.env.DRIZZLE_GATEWAY_MASTERPASS ? 'DRIZZLE_GATEWAY_MASTERPASS' : 'MASTERPASS';
+        console.log(`Using ${envVarName} (length: ${masterpass.length} characters)`);
       }
 
       this.gatewayProcess = spawn(gatewayPath, [], {
