@@ -1,9 +1,9 @@
 import { spawn, ChildProcess } from 'child_process';
-import { bin as cloudflaredPath } from 'cloudflared';
+import { Tunnel } from 'cloudflared';
 
 class ProcessManager {
   private gatewayProcess: ChildProcess | null = null;
-  private tunnelProcess: ChildProcess | null = null;
+  private tunnel: Tunnel | null = null;
   private isShuttingDown = false;
 
   constructor() {
@@ -89,72 +89,63 @@ class ProcessManager {
   }
 
   private async startCloudflaredTunnel(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const tunnelToken = process.env.CLOUDFLARE_TUNNEL_TOKEN;
-      const port = process.env.PORT || '4983';
-      let args: string[];
+    const tunnelToken = process.env.CLOUDFLARE_TUNNEL_TOKEN;
+    const port = process.env.PORT || '4983';
 
-      if (tunnelToken) {
-        console.log('Starting Cloudflare tunnel with token...');
-        args = ['tunnel', '--no-autoupdate', 'run', '--token', tunnelToken];
-      } else {
-        console.log('Starting temporary Cloudflare tunnel (no token provided)...');
-        console.log('Note: This will generate a random *.trycloudflare.com URL');
-        args = ['tunnel', '--no-autoupdate', '--url', `http://localhost:${port}`];
-      }
-
-      this.tunnelProcess = spawn(cloudflaredPath, args, {
-        stdio: ['pipe', 'pipe', 'pipe'],
+    if (tunnelToken) {
+      console.log('Starting Cloudflare tunnel with token...');
+      // For token-based tunnels, use the token directly
+      this.tunnel = new Tunnel({
+        'protocol': 'http',
+        'port': parseInt(port),
+        '--no-autoupdate': true,
+        'token': tunnelToken,
       });
-
-      this.tunnelProcess.stdout?.on('data', (data) => {
-        const output = data.toString();
-        process.stdout.write(`[Tunnel] ${output}`);
-        
-        // Look for the temporary tunnel URL in the output
-        if (!tunnelToken && output.includes('trycloudflare.com')) {
-          const urlMatch = output.match(/https:\/\/[^\s]+\.trycloudflare\.com/);
-          if (urlMatch) {
-            console.log(`\n🌐 Temporary tunnel URL: ${urlMatch[0]}`);
-          }
-        }
+    } else {
+      console.log('Starting temporary Cloudflare tunnel (no token provided)...');
+      console.log('Note: This will generate a random *.trycloudflare.com URL');
+      // For temporary tunnels, use quick mode
+      this.tunnel = Tunnel.quick({
+        protocol: 'http',
+        port: parseInt(port),
       });
+    }
 
-      this.tunnelProcess.stderr?.on('data', (data) => {
-        const output = data.toString();
-        process.stderr.write(`[Tunnel] ${output}`);
-        
-        // Also check stderr for the URL (cloudflared sometimes outputs there)
-        if (!tunnelToken && output.includes('trycloudflare.com')) {
-          const urlMatch = output.match(/https:\/\/[^\s]+\.trycloudflare\.com/);
-          if (urlMatch) {
-            console.log(`\n🌐 Temporary tunnel URL: ${urlMatch[0]}`);
-          }
-        }
-      });
-
-      this.tunnelProcess.on('close', (code) => {
-        console.log(`Cloudflare tunnel process exited with code ${code}`);
-        if (!this.isShuttingDown) {
-          this.shutdown();
-        }
-      });
-
-      this.tunnelProcess.on('error', (err) => {
-        console.error('Failed to start Cloudflare tunnel:', err);
-        reject(err);
-      });
-
-      // Give tunnel a moment to start
-      setTimeout(() => {
-        if (this.tunnelProcess && !this.tunnelProcess.killed) {
-          console.log('Cloudflare tunnel started');
-          resolve();
-        } else {
-          reject(new Error('Tunnel failed to start'));
-        }
-      }, 3000);
+    // Listen for tunnel events
+    this.tunnel.on('url', (url: string) => {
+      console.log(`\n🌐 Tunnel URL: ${url}`);
     });
+
+    this.tunnel.on('connected', (connection: any) => {
+      console.log(`Tunnel connected: ${JSON.stringify(connection)}`);
+    });
+
+    this.tunnel.on('log', (log: string) => {
+      process.stdout.write(`[Tunnel] ${log}\n`);
+    });
+
+    this.tunnel.on('error', (error: Error) => {
+      console.error('Tunnel error:', error);
+      if (!this.isShuttingDown) {
+        this.shutdown();
+      }
+    });
+
+    this.tunnel.on('exit', (code: number) => {
+      console.log(`Cloudflare tunnel process exited with code ${code}`);
+      if (!this.isShuttingDown) {
+        this.shutdown();
+      }
+    });
+
+    try {
+      // Start the tunnel
+      await this.tunnel.start();
+      console.log('Cloudflare tunnel started successfully');
+    } catch (error) {
+      console.error('Failed to start Cloudflare tunnel:', error);
+      throw error;
+    }
   }
 
   private keepAlive() {
@@ -178,8 +169,16 @@ class ProcessManager {
       promises.push(this.killProcess(this.gatewayProcess, 'Gateway'));
     }
 
-    if (this.tunnelProcess) {
-      promises.push(this.killProcess(this.tunnelProcess, 'Tunnel'));
+    if (this.tunnel) {
+      promises.push(new Promise<void>((resolve) => {
+        console.log('Stopping Cloudflare tunnel...');
+        this.tunnel!.stop();
+        // Give it a moment to stop gracefully
+        setTimeout(() => {
+          console.log('Tunnel stopped');
+          resolve();
+        }, 1000);
+      }));
     }
 
     Promise.all(promises).then(() => {
