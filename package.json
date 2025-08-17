@@ -3,7 +3,14 @@
   "version": "1.0.0",
   "scripts": {
     "start": "bun src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build": "bun build --compile --minify --sourcemap ./src/index.ts --outfile drizzle-gateway",
+    "build:linux-x64": "bun build --compile --target=bun-linux-x64 --minify ./src/index.ts --outfile drizzle-gateway-linux-x64",
+    "build:linux-arm64": "bun build --compile --target=bun-linux-arm64 --minify ./src/index.ts --outfile drizzle-gateway-linux-arm64",
+    "build:macos-x64": "bun build --compile --target=bun-darwin-x64 --minify ./src/index.ts --outfile drizzle-gateway-macos-x64",
+    "build:macos-arm64": "bun build --compile --target=bun-darwin-arm64 --minify ./src/index.ts --outfile drizzle-gateway-macos-arm64",
+    "build:windows": "bun build --compile --target=bun-windows-x64 --minify ./src/index.ts --outfile drizzle-gateway-windows.exe",
+    "build:all": "npm run build:linux-x64 && npm run build:linux-arm64 && npm run build:macos-x64 && npm run build:macos-arm64 && npm run build:windows"
   },
   "dependencies": {
     "cloudflared": "^0.1.1"

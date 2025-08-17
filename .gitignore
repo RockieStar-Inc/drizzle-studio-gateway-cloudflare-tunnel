@@ -32,3 +32,13 @@ Temporary Items
 node_modules/
 
 data/
+
+# Built binaries
+drizzle-gateway
+drizzle-gateway-*
+*.exe
+
+# Environment files
+.env
+.env.local
+.env.production

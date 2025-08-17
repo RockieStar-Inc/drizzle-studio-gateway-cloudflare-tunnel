@@ -6,14 +6,47 @@ A Docker setup that combines Drizzle Studio Gateway with Cloudflare Tunnel for s
 
 - **Drizzle Studio Gateway**: Web-based database management interface
 - **Cloudflare Tunnel**: Secure public access without exposing ports (permanent or temporary)
-- **Cross-Platform**: Works locally on macOS/Linux or in Docker containers
-- **Pre-built Docker Image**: Ready-to-use image from GitHub Container Registry
-- **Bun Runtime**: Fast TypeScript/JavaScript runtime managing both processes
+- **Cross-Platform**: Works on macOS, Linux, Windows, and Docker
+- **Multiple Installation Options**:
+  - Standalone executables for all platforms
+  - Pre-built Docker image from GitHub Container Registry
+  - Build from source with Docker
+  - Run directly with Bun runtime
+- **Automatic Binary Management**: Downloads Drizzle Gateway binary for your platform
 - **Process Management**: TypeScript-based process manager for both services
 
 ## Quick Start
 
-### Option 1: Using Pre-built Docker Image (Recommended)
+### Option 1: Using Standalone Binary (Simplest)
+
+Download the pre-built binary for your platform from the [latest release](https://github.com/RockieStar-Inc/drizzle-studio-gateway-cloudflare-tunnel/releases/latest):
+
+```bash
+# macOS (Apple Silicon)
+curl -L https://github.com/RockieStar-Inc/drizzle-studio-gateway-cloudflare-tunnel/releases/latest/download/drizzle-gateway-macos-arm64.tar.gz | tar -xz
+chmod +x drizzle-gateway-macos-arm64
+
+# macOS (Intel)
+curl -L https://github.com/RockieStar-Inc/drizzle-studio-gateway-cloudflare-tunnel/releases/latest/download/drizzle-gateway-macos-x64.tar.gz | tar -xz
+chmod +x drizzle-gateway-macos-x64
+
+# Linux x64
+curl -L https://github.com/RockieStar-Inc/drizzle-studio-gateway-cloudflare-tunnel/releases/latest/download/drizzle-gateway-linux-x64.tar.gz | tar -xz
+chmod +x drizzle-gateway-linux-x64
+
+# Linux ARM64
+curl -L https://github.com/RockieStar-Inc/drizzle-studio-gateway-cloudflare-tunnel/releases/latest/download/drizzle-gateway-linux-arm64.tar.gz | tar -xz
+chmod +x drizzle-gateway-linux-arm64
+```
+
+Run with environment variables:
+```bash
+DRIZZLE_GATEWAY_MASTERPASS=your-secure-password \
+CLOUDFLARE_TUNNEL_TOKEN=your-token \
+./drizzle-gateway-<platform>
+```
+
+### Option 2: Using Pre-built Docker Image (Recommended for Production)
 
 1. **Create project directory**:
    ```bash
@@ -32,7 +65,7 @@ A Docker setup that combines Drizzle Studio Gateway with Cloudflare Tunnel for s
    docker-compose up -d
    ```
 
-### Option 2: Build from Source
+### Option 3: Build from Source
 
 1. **Clone and setup**:
    ```bash
@@ -57,7 +90,7 @@ A Docker setup that combines Drizzle Studio Gateway with Cloudflare Tunnel for s
    docker-compose up --build
    ```
 
-### Option 3: Run Locally (macOS/Linux)
+### Option 4: Run from Source with Bun (macOS/Linux)
 
 1. **Clone repository**:
    ```bash
@@ -169,6 +202,41 @@ docker run -d \
 - For local development, expose port 4983 by uncommenting the ports section in `docker-compose.yml`
 - The application automatically downloads platform-specific Drizzle Gateway binaries for macOS/Linux
 - Binaries are cached in `node_modules/.bin` for subsequent runs
+
+### Building Standalone Executables
+
+You can build standalone executables using Bun's compile feature:
+
+```bash
+# Build for current platform
+bun build --compile --minify --sourcemap ./src/index.ts --outfile drizzle-gateway
+
+# Cross-compile for other platforms
+bun build --compile --target=bun-linux-x64 --minify ./src/index.ts --outfile drizzle-gateway-linux-x64
+bun build --compile --target=bun-darwin-arm64 --minify ./src/index.ts --outfile drizzle-gateway-macos-arm64
+bun build --compile --target=bun-windows-x64 --minify ./src/index.ts --outfile drizzle-gateway-windows.exe
+```
+
+Available targets:
+- `bun-linux-x64` - Linux x64
+- `bun-linux-arm64` - Linux ARM64
+- `bun-darwin-x64` - macOS x64 (Intel)
+- `bun-darwin-arm64` - macOS ARM64 (Apple Silicon)
+- `bun-windows-x64` - Windows x64
+
+### Release Process
+
+Releases are automated via GitHub Actions. When you create a git tag:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The workflow will:
+1. Build executables for all platforms
+2. Create a GitHub release with the binaries
+3. Push updated Docker images
 
 ## Troubleshooting
 
