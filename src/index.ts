@@ -1,5 +1,6 @@
 import { spawn, ChildProcess } from 'child_process';
-import { tunnel as createTunnel } from 'cloudflared';
+import { bin, tunnel as createTunnel, install } from 'cloudflared';
+import fs from 'fs';
 
 class ProcessManager {
   private gatewayProcess: ChildProcess | null = null;
@@ -18,7 +19,10 @@ class ProcessManager {
 
   async start() {
     console.log('Starting Drizzle Studio Gateway and Cloudflare Tunnel...');
-    
+    if (!fs.existsSync(bin)) {
+      // install cloudflared binary
+      await install(bin);
+    }
     try {
       await this.startDrizzleGateway();
       await this.startCloudflaredTunnel();
