@@ -1,6 +1,10 @@
 import { spawn, ChildProcess } from 'child_process';
 import { bin, tunnel as createTunnel, install } from 'cloudflared';
 import fs from 'fs';
+import path from 'path';
+import https from 'https';
+import { createWriteStream } from 'fs';
+import { platform, arch } from 'os';
 
 class ProcessManager {
   private gatewayProcess: ChildProcess | null = null;
@@ -17,12 +21,95 @@ class ProcessManager {
     });
   }
 
+  private async downloadFile(url: string, dest: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const file = createWriteStream(dest);
+      https.get(url, (response) => {
+        if (response.statusCode === 302 || response.statusCode === 301) {
+          // Handle redirect
+          const redirectUrl = response.headers.location;
+          if (redirectUrl) {
+            https.get(redirectUrl, (redirectResponse) => {
+              redirectResponse.pipe(file);
+              file.on('finish', () => {
+                file.close();
+                resolve();
+              });
+            }).on('error', reject);
+          }
+        } else {
+          response.pipe(file);
+          file.on('finish', () => {
+            file.close();
+            resolve();
+          });
+        }
+      }).on('error', reject);
+    });
+  }
+
+  private async ensureDrizzleGateway(): Promise<string> {
+    // Determine the platform and architecture
+    const isDocker = fs.existsSync('/.dockerenv') || process.env.DOCKER_CONTAINER === 'true';
+    const osPlatform = platform();
+    const osArch = arch();
+    
+    let gatewayPath: string;
+    let downloadUrl: string;
+    
+    if (isDocker) {
+      // In Docker, use the system-wide binary
+      gatewayPath = '/usr/local/bin/drizzle-gateway';
+      return gatewayPath;
+    } else {
+      // For local development, download to node_modules/.bin
+      const nodeModulesBin = path.join(process.cwd(), 'node_modules', '.bin');
+      if (!fs.existsSync(nodeModulesBin)) {
+        fs.mkdirSync(nodeModulesBin, { recursive: true });
+      }
+      
+      // Determine the binary name and download URL based on platform
+      if (osPlatform === 'darwin') {
+        if (osArch === 'arm64') {
+          gatewayPath = path.join(nodeModulesBin, 'drizzle-gateway');
+          downloadUrl = 'https://pub-e240a4fd7085425baf4a7951e7611520.r2.dev/drizzle-gateway-1.0.2-macos-arm64';
+        } else {
+          gatewayPath = path.join(nodeModulesBin, 'drizzle-gateway');
+          downloadUrl = 'https://pub-e240a4fd7085425baf4a7951e7611520.r2.dev/drizzle-gateway-1.0.2-macos-x64';
+        }
+      } else if (osPlatform === 'linux') {
+        gatewayPath = path.join(nodeModulesBin, 'drizzle-gateway');
+        downloadUrl = 'https://pub-e240a4fd7085425baf4a7951e7611520.r2.dev/drizzle-gateway-1.0.2-linux-x64';
+      } else {
+        throw new Error(`Unsupported platform: ${osPlatform}`);
+      }
+      
+      // Download if not exists
+      if (!fs.existsSync(gatewayPath)) {
+        console.log(`Downloading Drizzle Gateway for ${osPlatform} ${osArch}...`);
+        console.log(`From: ${downloadUrl}`);
+        console.log(`To: ${gatewayPath}`);
+        
+        await this.downloadFile(downloadUrl, gatewayPath);
+        
+        // Make executable
+        fs.chmodSync(gatewayPath, 0o755);
+        console.log('Drizzle Gateway downloaded successfully');
+      }
+      
+      return gatewayPath;
+    }
+  }
+
   async start() {
     console.log('Starting Drizzle Studio Gateway and Cloudflare Tunnel...');
+    
+    // Install cloudflared if needed
     if (!fs.existsSync(bin)) {
-      // install cloudflared binary
+      console.log('Installing cloudflared binary...');
       await install(bin);
     }
+    
     try {
       await this.startDrizzleGateway();
       await this.startCloudflaredTunnel();
@@ -38,12 +125,13 @@ class ProcessManager {
   }
 
   private async startDrizzleGateway(): Promise<void> {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       console.log('Starting Drizzle Studio Gateway...');
       
-      const gatewayPath = '/usr/local/bin/drizzle-gateway';
+      // Get the correct gateway path based on environment
+      const gatewayPath = await this.ensureDrizzleGateway();
       const port = process.env.PORT || '4983';
-      const storePath = process.env.STORE_PATH || '/app/data';
+      const storePath = process.env.STORE_PATH || './data';
       
       const env: Record<string, string> = {
         ...process.env,
@@ -109,11 +197,9 @@ class ProcessManager {
     } else {
       console.log('Starting temporary Cloudflare tunnel (no token provided)...');
       console.log('Note: This will generate a random *.trycloudflare.com URL');
-      // For temporary tunnels
+      // For temporary tunnels - don't use double dashes in keys
       options = {
-        'tunnel': '--url',
-        '--url': `http://localhost:${port}`,
-        '--no-autoupdate': null,
+        'url': `http://localhost:${port}`,
       };
     }
 
