@@ -1,6 +1,6 @@
 {
   "name": "drizzle-gateway-cloudflared",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "scripts": {
     "start": "bun src/index.ts",
     "typecheck": "tsc --noEmit",
